@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Locator Hunt — QTH Guessing Game</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2530;
+    --text: #e6edf3;
+    --muted: #7d8a97;
+    --accent: #5b8cff;
+    --good: #3fb950;
+    --bad: #cf5b5b;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    height: 100%;
+  }
+  #app {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 16px 16px 28px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 2px 10px;
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  header b { color: var(--text); }
+
+  #progressTrack {
+    height: 4px;
+    background: #232b36;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  #progressFill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 999px;
+    width: 0%;
+    transition: width 0.25s ease;
+  }
+
+  #locatorPanel {
+    background: var(--panel);
+    border: 1px solid #232b36;
+    border-radius: 16px;
+    padding: 34px 20px;
+    text-align: center;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    position: relative;
+    overflow: hidden;
+  }
+  #locatorBadge {
+    font-weight: 800;
+    font-size: 3rem;
+    letter-spacing: 3px;
+    color: var(--accent);
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  #answers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .answer-btn {
+    appearance: none;
+    border: 1px solid #2c3742;
+    background: var(--panel-2);
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 16px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+    min-height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  }
+  .answer-btn:active { transform: scale(0.97); }
+  .answer-btn:disabled { cursor: default; }
+  .answer-btn.correct {
+    background: rgba(63, 185, 80, 0.18);
+    border-color: var(--good);
+    color: #c4f0cb;
+  }
+  .answer-btn.wrong {
+    background: rgba(207, 91, 91, 0.18);
+    border-color: var(--bad);
+    color: #f5cccc;
+  }
+  .answer-btn.dim { opacity: 0.5; }
+
+  #summaryPanel {
+    display: none;
+    background: var(--panel);
+    border: 1px solid #232b36;
+    border-radius: 16px;
+    padding: 32px 24px;
+    text-align: center;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  }
+  #summaryScore {
+    font-weight: 800;
+    font-size: 2.6rem;
+    color: var(--accent);
+  }
+  #summaryList {
+    margin-top: 22px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 340px;
+    overflow-y: auto;
+  }
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel-2);
+    border: 1px solid #2c3742;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+  }
+  .summary-row .loc {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .summary-row .ans { color: var(--good); }
+  .summary-row.miss .ans { color: var(--bad); }
+  .summary-row .loc { color: var(--good); }
+  .summary-row.miss .loc { color: var(--bad); }
+
+  #playAgainBtn, #startBtn {
+    margin-top: 24px;
+    background: var(--accent);
+    color: #0d1117;
+    border: none;
+    font-weight: 800;
+    font-size: 1rem;
+    padding: 12px 28px;
+    border-radius: 999px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #playAgainBtn:active, #startBtn:active { transform: scale(0.97); }
+
+  #startPanel {
+    background: var(--panel);
+    border: 1px solid #232b36;
+    border-radius: 16px;
+    padding: 60px 24px;
+    text-align: center;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  }
+  #summaryTime {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span><b id="qIndexVal">1</b> / <span id="qTotalVal">20</span></span>
+    <span>Score: <b id="scoreVal">0</b></span>
+  </header>
+  <div id="progressTrack"><div id="progressFill"></div></div>
+
+  <div id="startPanel">
+    <button id="startBtn" disabled>Start</button>
+  </div>
+
+  <div id="locatorPanel" style="display:none;">
+    <div id="locatorBadge">----</div>
+  </div>
+
+  <div id="answers"></div>
+
+  <div id="summaryPanel">
+    <div id="summaryScore">0/20</div>
+    <div id="summaryTime"></div>
+    <div id="summaryList"></div>
+    <button id="playAgainBtn">Play again</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const TOTAL_QUESTIONS = 20;
+  const REVEAL_DELAY_MS = 900;
+
+  const qIndexVal = document.getElementById("qIndexVal");
+  const qTotalVal = document.getElementById("qTotalVal");
+  const scoreVal = document.getElementById("scoreVal");
+  const progressFill = document.getElementById("progressFill");
+  const startPanel = document.getElementById("startPanel");
+  const startBtn = document.getElementById("startBtn");
+  const locatorPanel = document.getElementById("locatorPanel");
+  const locatorBadge = document.getElementById("locatorBadge");
+  const answersEl = document.getElementById("answers");
+  const summaryPanel = document.getElementById("summaryPanel");
+  const summaryScore = document.getElementById("summaryScore");
+  const summaryTime = document.getElementById("summaryTime");
+  const summaryList = document.getElementById("summaryList");
+  const playAgainBtn = document.getElementById("playAgainBtn");
+
+  let DATA = null;
+  let current = null;
+  let answered = false;
+  let score = 0;
+  let qNum = 0;
+  let usedLocators = new Set();
+  let results = [];
+  let startTime = 0;
+
+  qTotalVal.textContent = TOTAL_QUESTIONS;
+
+  function weightedPick(list) {
+    const totalW = list.reduce((s, r) => s + r.weight, 0);
+    let r = Math.random() * totalW;
+    for (const item of list) {
+      r -= item.weight;
+      if (r <= 0) return item;
+    }
+    return list[list.length - 1];
+  }
+
+  function pickLocator() {
+    const available = DATA.locators.filter(l => !usedLocators.has(l.locator));
+    const pool = available.length > 0 ? available : DATA.locators;
+    const loc = weightedPick(pool);
+    usedLocators.add(loc.locator);
+    return loc;
+  }
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function buildChoices(loc) {
+    const correct = loc.countries.slice();
+    const pool = DATA.countries.filter(c => !correct.includes(c));
+    const distractorsNeeded = Math.max(0, 4 - correct.length);
+    const distractors = shuffle(pool).slice(0, distractorsNeeded);
+    return shuffle(correct.concat(distractors));
+  }
+
+  function startGame() {
+    score = 0;
+    qNum = 0;
+    usedLocators = new Set();
+    results = [];
+    startTime = Date.now();
+    scoreVal.textContent = "0";
+    startPanel.style.display = "none";
+    summaryPanel.style.display = "none";
+    locatorPanel.style.display = "block";
+    answersEl.style.display = "grid";
+    renderQuestion();
+  }
+
+  function renderQuestion() {
+    qNum++;
+    answered = false;
+    qIndexVal.textContent = qNum;
+    progressFill.style.width = ((qNum - 1) / TOTAL_QUESTIONS * 100) + "%";
+
+    current = pickLocator();
+    locatorBadge.textContent = current.locator;
+
+    const choices = buildChoices(current);
+    answersEl.innerHTML = "";
+    choices.forEach(country => {
+      const btn = document.createElement("button");
+      btn.className = "answer-btn";
+      btn.textContent = country;
+      btn.addEventListener("click", () => handleAnswer(country, btn));
+      answersEl.appendChild(btn);
+    });
+  }
+
+  function handleAnswer(country, btn) {
+    if (answered) return;
+    answered = true;
+
+    const isCorrect = current.countries.includes(country);
+    if (isCorrect) {
+      score++;
+      btn.classList.add("correct");
+    } else {
+      btn.classList.add("wrong");
+    }
+
+    Array.from(answersEl.children).forEach(b => {
+      b.disabled = true;
+      if (current.countries.includes(b.textContent) && b !== btn) {
+        b.classList.add("correct");
+      }
+      if (b !== btn && !current.countries.includes(b.textContent)) {
+        b.classList.add("dim");
+      }
+    });
+
+    results.push({ locator: current.locator, countries: current.countries, picked: country, correct: isCorrect });
+    scoreVal.textContent = score;
+
+    setTimeout(() => {
+      if (qNum >= TOTAL_QUESTIONS) {
+        showSummary();
+      } else {
+        renderQuestion();
+      }
+    }, REVEAL_DELAY_MS);
+  }
+
+  function showSummary() {
+    progressFill.style.width = "100%";
+    locatorPanel.style.display = "none";
+    answersEl.style.display = "none";
+    summaryPanel.style.display = "block";
+    summaryScore.textContent = `${score}/${TOTAL_QUESTIONS}`;
+
+    const elapsedSec = (Date.now() - startTime) / 1000;
+    const mins = Math.floor(elapsedSec / 60);
+    const secs = (elapsedSec % 60).toFixed(1);
+    summaryTime.textContent = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+    summaryList.innerHTML = "";
+    results.forEach(r => {
+      const row = document.createElement("div");
+      row.className = "summary-row" + (r.correct ? "" : " miss");
+      const loc = document.createElement("span");
+      loc.className = "loc";
+      loc.textContent = r.locator;
+      const ans = document.createElement("span");
+      ans.className = "ans";
+      ans.textContent = r.correct ? r.countries.join(" / ") : `${r.picked || "—"} → ${r.countries.join(" / ")}`;
+      row.appendChild(loc);
+      row.appendChild(ans);
+      summaryList.appendChild(row);
+    });
+  }
+
+  playAgainBtn.addEventListener("click", startGame);
+  startBtn.addEventListener("click", startGame);
+
+  fetch("data.json")
+    .then(r => r.json())
+    .then(data => {
+      DATA = data;
+      startBtn.disabled = false;
+    });
+})();
+</script>
+</body>
+</html>
